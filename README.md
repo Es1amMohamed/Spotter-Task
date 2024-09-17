@@ -118,9 +118,6 @@ The recommendation system uses TF-IDF vectorization and cosine similarity to sug
 
 Feel free to fork this repository and submit pull requests. If you encounter any issues or have suggestions, please open an issue on GitHub.
 
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
