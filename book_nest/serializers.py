@@ -35,11 +35,13 @@ class BookSerializer(serializers.ModelSerializer):
     """
 
     auther_name = serializers.SerializerMethodField()
+    auther = serializers.PrimaryKeyRelatedField(queryset=Auther.objects.all())
 
     class Meta:
         model = Book
         fields = [
             "title",
+            "auther",
             "auther_name",
             "description",
             "category",

@@ -38,7 +38,11 @@ class SignUpAPIView(APIView):
                 login(request, user)
                 refresh = RefreshToken.for_user(user)
                 return Response(
-                    {"message": "Your account created successfully"},
+                    {
+                        "message": "Your account created successfully",
+                        "refresh": str(refresh),
+                        "access": str(refresh.access_token),
+                    },
                     status=status.HTTP_201_CREATED,
                 )
             else:
@@ -71,7 +75,7 @@ class LoginAPIView(APIView):
 
         if user is not None:
             return Response(
-                {"message": f"Welcome, {username}"}, status=status.HTTP_200_OK
+                {"message": f"Welcome, {user.first_name}"}, status=status.HTTP_200_OK
             )
         else:
             return Response(
