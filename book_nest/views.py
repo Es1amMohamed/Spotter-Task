@@ -5,7 +5,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework import status
-from .utils import recommend_books
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 
@@ -145,54 +145,109 @@ class AutherViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class FavoriteViewSet(viewsets.ModelViewSet):
+class FavoriteBookViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage user's favorite books.
+
+    Provides functionality for:
+    - Adding a book to the user's favorites list.
+    - Removing a book from the user's favorites list.
+    - Retrieving book recommendations based on the user's favorites list.
+    """
+
+    queryset = Favorite.objects.all()
     serializer_class = FavoriteSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """
-        Return the list of favorite books for the current user.
+        Overrides the default queryset to return only the favorite books for the authenticated user.
         """
-        user = self.request.user
-        return Favorite.objects.filter(user=user)
 
-    def create(self, request, *args, **kwargs):
+        return Favorite.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=["post"])
+    def add_favorite(self, request):
         """
-        Add a book to the current user's favorites and return recommendations.
+        POST action to add a book to the user's favorites list.
+
+        Parameters:
+            - book_id (int): The ID of the book to be added to the favorites.
+
+        Returns:
+            - A success message if the book is added successfully.
+            - An error message if the book does not exist.
         """
         book_id = request.data.get("book")
-        if not Book.objects.filter(id=book_id).exists():
-            return Response(
-                {"error": "Book not found."}, status=status.HTTP_400_BAD_REQUEST
-            )
+        user = request.user
 
-        data = {"user": request.user.id, "book": book_id}
-        serializer = self.get_serializer(data=data)
-        if serializer.is_valid():
-            self.perform_create(serializer)
-            user_favorites = (
-                self.get_queryset()
-            )  # Ensure it gets favorites for the logged-in user
-            recommended_books = recommend_books(user_favorites)
-            return Response(
-                {
-                    "message": "Book added to favorites successfully",
-                    "recommendations": [book.title for book in recommended_books],
-                },
-                status=status.HTTP_201_CREATED,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Debugging output to verify book_id
+        print(f"book_id received: {book_id}")
 
-    def destroy(self, request, *args, **kwargs):
-        """
-        Remove a book from the current user's favorites.
-        """
-        book_id = self.kwargs.get("pk")
         try:
-            favorite = Favorite.objects.get(user=request.user, book_id=book_id)
-            self.perform_destroy(favorite)
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            book = Book.objects.get(id=book_id)
+            user_id = User.objects.get(id=user.id)
+            # Check if the book is already in the user's favorites
+            if Favorite.objects.filter(user=user_id, book=book).exists():
+                return Response(
+                    {"message": "Book is already in your favorites."}, status=400
+                )
+
+            # Add the book to the favorites if it's not already there
+            Favorite.objects.create(user=user_id, book=book)
+            return Response({"message": "Book added to favorites"})
+
+        except Book.DoesNotExist:
+            return Response({"error": "Book not found"}, status=404)
+        except ValueError:
+            return Response({"error": "Invalid book ID format"}, status=400)
+
+    @action(detail=True, methods=["delete"])
+    def remove_favorite(self, request, pk=None):
+        """
+        DELETE action to remove a book from the user's favorites list.
+
+        URL Parameter:
+            - pk (int): The ID of the book to be removed from the favorites.
+
+        Returns:
+            - A success message if the book is removed successfully.
+            - An error message if the favorite book does not exist.
+        """
+
+        user = request.user
+        try:
+            favorite = Favorite.objects.get(user=user, book_id=pk)
+            favorite.delete()
+            return Response({"message": "Book removed from favorites"})
         except Favorite.DoesNotExist:
-            return Response(
-                {"error": "Favorite not found."}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Favorite book not found"}, status=404)
+
+    @action(detail=False, methods=["get"])
+    def recommendations(self, request):
+        """
+        GET action to retrieve book recommendations based on the user's favorite books.
+
+        Recommendations are based on the categories and authors of the books in the user's favorites list.
+
+        Returns:
+            - A list of up to 5 recommended book titles.
+            - An error message if no favorite books are found.
+        """
+
+        user = request.user
+        favorites = Favorite.objects.filter(user=user).values_list(
+            "book__id", "book__category", "book__auther"
+        )
+
+        if not favorites.exists():
+            return Response({"message": "No favorite books found."}, status=404)
+
+        categories = [fav[1] for fav in favorites]
+        authors = [fav[2] for fav in favorites]
+        favorite_ids = [fav[0] for fav in favorites]
+        recommended_books = Book.objects.filter(category__in=categories).exclude(
+            id__in=favorite_ids
+        )[:5]
+
+        return Response({"recommendations": [book.title for book in recommended_books]})

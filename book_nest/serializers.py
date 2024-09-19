@@ -74,6 +74,28 @@ class FavoriteSerializer(serializers.ModelSerializer):
         book (ForeignKey): The book that has been marked as a favorite.
     """
 
+    book_title = serializers.SerializerMethodField()
+    first_name = serializers.SerializerMethodField()
+    book = serializers.PrimaryKeyRelatedField(queryset=Book.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+
     class Meta:
         model = Favorite
-        fields = ["id", "user", "book"]
+        fields = ["id", "user", "book", "first_name", "book_title"]
+
+    def get_book_title(self, obj):
+        """
+        Retrieve the title of the  given book.
+
+        Args:
+            obj (Book): The book instance.
+
+        Returns:
+            str: The title of the book.
+        """
+
+        return obj.book.title
+
+    def get_first_name(self, obj):
+
+        return obj.user.first_name

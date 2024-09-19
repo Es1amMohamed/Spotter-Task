@@ -8,7 +8,7 @@ app_name = "book_nest"
 router = DefaultRouter()  # Create a router and register our viewsets with it.
 router.register("books", BookViewSet)
 router.register("authers", AutherViewSet)
-router.register("favorites", FavoriteViewSet, basename="favorite")
+router.register("favorites", FavoriteBookViewSet, basename="favorite")
 
 urlpatterns = [
     path(
